@@ -9,24 +9,40 @@
 namespace {
     using std::vector, std::queue;
 
+    constexpr size_t no_node = std::numeric_limits<size_t>::max();
+    constexpr size_t no_edge = std::numeric_limits<size_t>::max();
+
+    struct edge {
+        size_t destination;
+        int capacity;
+        int cost;
+    };
+
     struct flow_network {
-        vector<vector<int>> active;
-        vector<vector<int>> dropped;
+        vector<edge> edges;
+        vector<vector<size_t>> outgoing;
         vector<int> balance;
 
         explicit flow_network(const size_t node_count):
-            active(node_count, vector(node_count, 0)),
-            dropped(node_count, vector(node_count, 0)),
+            outgoing(node_count),
             balance(node_count, 0) {}
+
+        size_t add_edge(const size_t src, const size_t dst, const int cap, const int cost) {
+            outgoing[src].push_back(edges.size());
+            edges.push_back({.destination = dst, .capacity = cap, .cost = cost});
+            outgoing[dst].push_back(edges.size());
+            edges.push_back({.destination = src, .capacity = 0, .cost = -cost});
+            return edges.size()-2;
+        }
     };
 
     struct spfa_result {
         vector<int> cost;
-        vector<size_t> prev;
+        vector<size_t> prev_edge;
 
         explicit spfa_result(const size_t node_count):
             cost(node_count, std::numeric_limits<int>::max()),
-            prev(node_count, 0) {}
+            prev_edge(node_count, no_edge) {}
     };
 
     spfa_result spfa(const flow_network& network, const size_t source) {
@@ -39,21 +55,16 @@ namespace {
         while (!next.empty()) {
             const size_t current_node = next.front();
             next.pop();
-            // Look for forward active edges and backwards dropped edges
-            for (size_t target_node = 1; target_node < node_count; target_node++) {
-                if (network.active[current_node][target_node] > 0) {
-                    if (const int new_cost = result.cost[current_node] + 1; new_cost < result.cost[target_node]) {
-                        result.prev[target_node] = current_node;
-                        result.cost[target_node] = new_cost;
-                        next.push(target_node);
-                    }
-                }
-                if (network.dropped[target_node][current_node] > 0) {
-                    if (const int new_cost = result.cost[current_node] - 1; new_cost < result.cost[target_node]) {
-                        result.prev[target_node] = current_node;
-                        result.cost[target_node] = new_cost;
-                        next.push(target_node);
-                    }
+            // Check all outgoing edges with capacity > 0 for creating a cheaper path to a node
+            for (const size_t current_edge: network.outgoing[current_node]) {
+                if (network.edges[current_edge].capacity == 0) continue;
+
+                const int new_cost = result.cost[current_node] + network.edges[current_edge].cost;
+                const size_t target_node = network.edges[current_edge].destination;
+                if (new_cost < result.cost[target_node]) {
+                    result.prev_edge[target_node] = current_edge;
+                    result.cost[target_node] = new_cost;
+                    next.push(target_node);
                 }
             }
         }
@@ -68,7 +79,7 @@ namespace {
             const size_t destination = dst[i];
             network.balance[source] += 1;
             network.balance[destination] -= 1;
-            network.active[source][destination] += 1;
+            network.add_edge(source, destination, 1, 1);
         }
 
         // Balance all nodes in the network
@@ -86,7 +97,7 @@ namespace {
                 spfa_result result = spfa(network, surplus_node);
 
                 // Find cheapest deficit node to reach from the surplus node
-                size_t deficit_node = 0;
+                size_t deficit_node = no_node;
                 int lowest_cost = std::numeric_limits<int>::max();
                 for (size_t target_node = 1; target_node <= group_count; target_node++) {
                     if (network.balance[target_node] < 0 && result.cost[target_node] < lowest_cost) {
@@ -94,42 +105,24 @@ namespace {
                         deficit_node = target_node;
                     }
                 }
+                if (deficit_node == no_node) throw std::logic_error("No deficit node found to pair with surplus node");
 
                 // Backtrack from the deficit node to the surplus node, flipping edges along the way
                 size_t current_node = deficit_node;
                 while (current_node != surplus_node) {
-                    const size_t next_node = result.prev[current_node];
-                    if (network.dropped[current_node][next_node] > 0) {
-                        network.dropped[current_node][next_node] -= 1;
-                        network.active[current_node][next_node] += 1;
-                        network.balance[current_node] += 1;
-                        network.balance[next_node] -= 1;
-                    }
-                    else if (network.active[next_node][current_node] > 0) {
-                        network.active[next_node][current_node] -= 1;
-                        network.dropped[next_node][current_node] += 1;
-                        network.balance[next_node] -= 1;
-                        network.balance[current_node] += 1;
-                    }
-                    else {
-                        throw std::logic_error("No edge to flip on path from surplus to deficit node");
-                    }
-                    current_node = next_node;
+                    const size_t current_edge = result.prev_edge[current_node];
+                    network.edges[current_edge].capacity -= 1;
+                    network.edges[current_edge ^ 1].capacity += 1;
+                    current_node = network.edges[current_edge ^ 1].destination;
                 }
+                network.balance[surplus_node] -= 1;
+                network.balance[deficit_node] += 1;
             }
         }
 
         // Write the results into keep
         for (size_t i = 0; i < move_count; i++) {
-            const size_t source = src[i];
-            const size_t destination = dst[i];
-            if (network.active[source][destination] > 0) {
-                keep[i] = 1;
-                network.active[source][destination] -= 1;
-            }
-            else {
-                keep[i] = 0;
-            }
+            keep[i] = network.edges[i * 2].capacity > 0;
         }
     }
 }

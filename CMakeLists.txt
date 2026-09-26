@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 4.3)
 project(group_mover)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 
 add_library(group_mover_lib SHARED group-mover.cpp group-mover.h)
 

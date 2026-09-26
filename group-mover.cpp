@@ -72,26 +72,8 @@ namespace {
         return result;
     }
 
-    void implementation(const int32_t* src, const int32_t* dst, const size_t move_count, uint8_t* keep) {
-        // Map group numbers to node indexes
-        unordered_map<int32_t, size_t> group_map;
-        for (size_t i = 0; i < move_count; i++) {
-            group_map.try_emplace(src[i], group_map.size());
-            group_map.try_emplace(dst[i], group_map.size());
-        }
-        const size_t node_count = group_map.size();
-        
-        // Create the network
-        flow_network network(node_count);
-        for (size_t i = 0; i < move_count; i++) {
-            const size_t source = group_map[src[i]];
-            const size_t destination = group_map[dst[i]];
-            network.balance[source] += 1;
-            network.balance[destination] -= 1;
-            network.add_edge(source, destination, 1, 1);
-        }
-
-        // Balance all nodes in the network
+    void balance_network(flow_network& network) {
+        const size_t node_count = network.balance.size();
         bool finished = false;
         while (!finished) {
             finished = true; // Assume the network is balanced until a surplus node is found
@@ -128,6 +110,29 @@ namespace {
                 network.balance[deficit_node] += 1;
             }
         }
+    }
+
+    void implementation(const int32_t* src, const int32_t* dst, const size_t move_count, uint8_t* keep) {
+        // Map group numbers to node indexes
+        unordered_map<int32_t, size_t> group_map;
+        for (size_t i = 0; i < move_count; i++) {
+            group_map.try_emplace(src[i], group_map.size());
+            group_map.try_emplace(dst[i], group_map.size());
+        }
+        const size_t node_count = group_map.size();
+        
+        // Create the network
+        flow_network network(node_count);
+        for (size_t i = 0; i < move_count; i++) {
+            const size_t source = group_map.at(src[i]);
+            const size_t destination = group_map.at(dst[i]);
+            network.balance[source] += 1;
+            network.balance[destination] -= 1;
+            network.add_edge(source, destination, 1, 1);
+        }
+
+        // Balance all nodes in the network
+        balance_network(network);
 
         // Write the results into keep
         for (size_t i = 0; i < move_count; i++) {

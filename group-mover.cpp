@@ -1,5 +1,6 @@
 #include "group-mover.h"
 
+#include <unordered_map>
 #include <stdexcept>
 #include <vector>
 #include <limits>
@@ -7,7 +8,7 @@
 #include <new>
 
 namespace {
-    using std::vector, std::queue;
+    using std::vector, std::queue, std::unordered_map;
 
     constexpr size_t no_node = std::numeric_limits<size_t>::max();
     constexpr size_t no_edge = std::numeric_limits<size_t>::max();
@@ -71,12 +72,20 @@ namespace {
         return result;
     }
 
-    void implementation(const int32_t* src, const int32_t* dst, const size_t move_count, const size_t group_count, uint8_t* keep) {
-        // Create the network
-        flow_network network(group_count);
+    void implementation(const int32_t* src, const int32_t* dst, const size_t move_count, uint8_t* keep) {
+        // Map group numbers to node indexes
+        unordered_map<int32_t, size_t> group_map;
         for (size_t i = 0; i < move_count; i++) {
-            const size_t source = src[i];
-            const size_t destination = dst[i];
+            group_map.try_emplace(src[i], group_map.size());
+            group_map.try_emplace(dst[i], group_map.size());
+        }
+        const size_t node_count = group_map.size();
+        
+        // Create the network
+        flow_network network(node_count);
+        for (size_t i = 0; i < move_count; i++) {
+            const size_t source = group_map[src[i]];
+            const size_t destination = group_map[dst[i]];
             network.balance[source] += 1;
             network.balance[destination] -= 1;
             network.add_edge(source, destination, 1, 1);
@@ -88,7 +97,7 @@ namespace {
             finished = true; // Assume the network is balanced until a surplus node is found
 
             // For any surplus node, find and drop the cheapest chain to a deficit node
-            for (size_t surplus_node = 0; surplus_node < group_count; surplus_node++) {
+            for (size_t surplus_node = 0; surplus_node < node_count; surplus_node++) {
                 // Skip a non-surplus node
                 if (network.balance[surplus_node] <= 0) continue;
                 finished = false; // Mark that there are still unbalanced nodes
@@ -99,7 +108,7 @@ namespace {
                 // Find cheapest deficit node to reach from the surplus node
                 size_t deficit_node = no_node;
                 int lowest_cost = std::numeric_limits<int>::max();
-                for (size_t target_node = 0; target_node < group_count; target_node++) {
+                for (size_t target_node = 0; target_node < node_count; target_node++) {
                     if (network.balance[target_node] < 0 && result.cost[target_node] < lowest_cost) {
                         lowest_cost = result.cost[target_node];
                         deficit_node = target_node;
@@ -132,17 +141,9 @@ extern "C" int32_t group_mover_select_moves(const int32_t* src, const int32_t* d
     if (move_count == 0) return GROUP_MOVER_OK;
     // Return error if null pointers were provided
     if (src == nullptr || dst == nullptr || keep == nullptr) return GROUP_MOVER_NULL_ARGUMENT;
-    // Check for invalid groups and set group_count
-    size_t group_count = 0;
-    for (size_t i = 0; i < move_count; i++) {
-        if (src[i] < 0 || dst[i] < 0) return GROUP_MOVER_INVALID_GROUP;
-        if (static_cast<size_t>(src[i]) > group_count) group_count = src[i];
-        if (static_cast<size_t>(dst[i]) > group_count) group_count = dst[i];
-    }
-    group_count += 1;
     // Call the implementation
     try {
-        implementation(src, dst, move_count, group_count, keep);
+        implementation(src, dst, move_count, keep);
     }
     catch (const std::bad_alloc&) {
         return GROUP_MOVER_OUT_OF_MEMORY;

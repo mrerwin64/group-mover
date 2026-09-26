@@ -73,7 +73,7 @@ namespace {
 
     void implementation(const int32_t* src, const int32_t* dst, const size_t move_count, const size_t group_count, uint8_t* keep) {
         // Create the network
-        flow_network network(group_count + 1);
+        flow_network network(group_count);
         for (size_t i = 0; i < move_count; i++) {
             const size_t source = src[i];
             const size_t destination = dst[i];
@@ -88,7 +88,7 @@ namespace {
             finished = true; // Assume the network is balanced until a surplus node is found
 
             // For any surplus node, find and drop the cheapest chain to a deficit node
-            for (size_t surplus_node = 1; surplus_node <= group_count; surplus_node++) {
+            for (size_t surplus_node = 0; surplus_node < group_count; surplus_node++) {
                 // Skip a non-surplus node
                 if (network.balance[surplus_node] <= 0) continue;
                 finished = false; // Mark that there are still unbalanced nodes
@@ -99,7 +99,7 @@ namespace {
                 // Find cheapest deficit node to reach from the surplus node
                 size_t deficit_node = no_node;
                 int lowest_cost = std::numeric_limits<int>::max();
-                for (size_t target_node = 1; target_node <= group_count; target_node++) {
+                for (size_t target_node = 0; target_node < group_count; target_node++) {
                     if (network.balance[target_node] < 0 && result.cost[target_node] < lowest_cost) {
                         lowest_cost = result.cost[target_node];
                         deficit_node = target_node;
@@ -132,13 +132,14 @@ extern "C" int32_t group_mover_select_moves(const int32_t* src, const int32_t* d
     if (move_count == 0) return GROUP_MOVER_OK;
     // Return error if null pointers were provided
     if (src == nullptr || dst == nullptr || keep == nullptr) return GROUP_MOVER_NULL_ARGUMENT;
-    // Check for invalid groups and update maximum group number
+    // Check for invalid groups and set group_count
     size_t group_count = 0;
     for (size_t i = 0; i < move_count; i++) {
-        if (src[i] < 1 || dst[i] < 1) return GROUP_MOVER_INVALID_GROUP;
+        if (src[i] < 0 || dst[i] < 0) return GROUP_MOVER_INVALID_GROUP;
         if (static_cast<size_t>(src[i]) > group_count) group_count = src[i];
         if (static_cast<size_t>(dst[i]) > group_count) group_count = dst[i];
     }
+    group_count += 1;
     // Call the implementation
     try {
         implementation(src, dst, move_count, group_count, keep);

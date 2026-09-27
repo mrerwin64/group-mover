@@ -12,34 +12,57 @@ int main() {
     // Get list of moves
     std::string line;
     vector<int32_t> src_vec;
-    vector<int32_t> dst_vec;
-    std::cout << "Input desired moves in separate lines as \"<src> <dst>\"; input blank line to proceed" << std::endl;
+    vector<vector<int32_t>> dst_vec_vec;
+    std::cout << "Input desired moves in separate lines as \"<src> <dst1> (<dst2> <dst3> ...)\"; ";
+    std::cout << "input blank line to proceed" << std::endl;
     while (std::getline(std::cin, line)) {
         std::istringstream iss(line);
         // Detect blank line and break
         iss >> std::ws;
         if (iss.eof()) break;
-        // Read and save what remains, checking for failure
-        int32_t src, dst;
-        if (!(iss >> src >> dst)) {
+        // Read the source, checking for failure
+        int32_t src;
+        if (!(iss >> src)) {
             std::cerr << "Incorrect input, move not accepted - try again" << "\n";
             std::cerr << "Rejected line: " << line << std::endl;
             continue;
         }
-        // Check for any trailing characters and reject the input
-        iss >> std::ws;
-        if (!iss.eof()) {
-            std::cerr << "Unexpected trailing characters - try again" << "\n";
-            std::cerr << "Rejected line: " << line << std::endl;
-            continue;
+        // Repeatedly read destinations, checking for failure
+        vector<int32_t> dst_vec;
+        while (!(iss >> std::ws).eof()) {
+            int32_t dst;
+            if (!(iss >> dst)) {
+                dst_vec.clear(); // Make the later check reject this line
+                break;
+            }
+            dst_vec.push_back(dst);
         }
-        src_vec.push_back(src);
-        dst_vec.push_back(dst);
+        // Check for empty destinations vector
+        if (!dst_vec.empty()) {
+            src_vec.push_back(src);
+            dst_vec_vec.push_back(dst_vec);
+        }
+        else {
+            std::cerr << "Incorrect input, move not accepted - try again" << "\n";
+            std::cerr << "Rejected line: " << line << std::endl;
+        }
     }
 
-    // Call the function selecting moves to keep and drop
-    vector<uint8_t> kept_vec(src_vec.size());
-    const int32_t status_code = group_mover_select_moves(src_vec.data(), dst_vec.data(), src_vec.size(), kept_vec.data());
+    // Prepare parameters for the library function
+    vector<int32_t> dst_vec;
+    vector<size_t> dst_counts;
+    for (const vector<int32_t>& destinations: dst_vec_vec) {
+        dst_vec.insert(dst_vec.end(), destinations.begin(), destinations.end());
+        dst_counts.push_back(destinations.size());
+    }
+    vector<int32_t> result_vec(src_vec.size());
+    // Call the function and check error string if one occurred
+    const int32_t status_code = group_mover_select_moves(
+        src_vec.data(),
+        dst_counts.data(),
+        dst_vec.data(),
+        src_vec.size(),
+        result_vec.data());
     if (status_code != GROUP_MOVER_OK) {
         const char* status_str = group_mover_status_string(status_code);
         std::cerr << "An error occurred: " << status_str << std::endl;
@@ -47,22 +70,21 @@ int main() {
     }
 
     // Print the results
-    unsigned int kept_moves = 0;
-    unsigned int dropped_moves = 0;
-    for (size_t i = 0; i < kept_vec.size(); i++) {
-        std::cout << src_vec[i] << " -> " << dst_vec[i] << ": ";
-        if (kept_vec[i] == 1) {
-            std::cout << "kept" << "\n";
-            kept_moves += 1;
+    unsigned int stayed_count = 0;
+    unsigned int moved_count = 0;
+    for (size_t i = 0; i < src_vec.size(); i++) {
+        if (src_vec[i] == result_vec[i]) {
+            stayed_count += 1;
+            std::cout << src_vec[i] << " stays" << "\n";
         }
         else {
-            std::cout << "dropped" << "\n";
-            dropped_moves += 1;
+            moved_count += 1;
+            std::cout << src_vec[i] << " -> " << result_vec[i] << "\n";
         }
     }
     std::cout << "\n" << "In total:" << "\n";
-    std::cout << kept_moves << " moves kept" << "\n";
-    std::cout << dropped_moves << " moves dropped" << std::endl;
+    std::cout << moved_count << " moved" << "\n";
+    std::cout << stayed_count << " stayed" << std::endl;
 
     return 0;
 }

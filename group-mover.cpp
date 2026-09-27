@@ -33,7 +33,7 @@ namespace {
             edges.push_back({.destination = dst, .capacity = cap, .cost = cost});
             outgoing[dst].push_back(edges.size());
             edges.push_back({.destination = src, .capacity = 0, .cost = -cost});
-            return edges.size()-2;
+            return edges.size() - 2;
         }
     };
 
@@ -127,14 +127,15 @@ namespace {
         }
         const size_t node_count = group_map.size();
         
-        // Create the network
+        // Create the network and map move indexes to edge indexes
         flow_network network(node_count);
+        vector<size_t> move_map(move_count);
         for (size_t i = 0; i < move_count; i++) {
             const size_t source = group_map.at(src[i]);
             const size_t destination = group_map.at(dst[i]);
             network.balance[source] += 1;
             network.balance[destination] -= 1;
-            network.add_edge(source, destination, 1, 1);
+            move_map[i] = network.add_edge(source, destination, 1, 1);
         }
 
         // Balance all nodes in the network
@@ -142,7 +143,7 @@ namespace {
 
         // Write the results into keep
         for (size_t i = 0; i < move_count; i++) {
-            keep[i] = network.edges[i * 2].capacity > 0;
+            keep[i] = network.edges[move_map[i]].capacity > 0;
         }
     }
 }

@@ -32,6 +32,8 @@ GROUP_MOVER_API int32_t group_mover_select_moves(
     size_t move_count,
     uint8_t* keep);
 
+GROUP_MOVER_API const char* group_mover_status_string(int32_t status_code);
+
 #ifdef __cplusplus
 }
 #endif

@@ -164,3 +164,14 @@ extern "C" int32_t group_mover_select_moves(const int32_t* src, const int32_t* d
     }
     return GROUP_MOVER_OK;
 }
+
+extern "C" const char* group_mover_status_string(const int32_t status_code) {
+    switch (status_code) {
+        case GROUP_MOVER_OK: return "ok";
+        case GROUP_MOVER_NULL_ARGUMENT: return "null argument";
+        case GROUP_MOVER_INVALID_GROUP: return "invalid group";
+        case GROUP_MOVER_OUT_OF_MEMORY: return "out of memory";
+        case GROUP_MOVER_INTERNAL_ERROR: return "internal error";
+        default: return "unknown error";
+    }
+}

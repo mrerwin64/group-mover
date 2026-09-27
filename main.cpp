@@ -4,6 +4,7 @@
 #include <sstream>
 #include <cstdint>
 #include <vector>
+#include <string>
 
 using std::vector;
 
@@ -12,21 +13,36 @@ int main() {
     std::string line;
     vector<int32_t> src_vec;
     vector<int32_t> dst_vec;
-    std::cout << "Input desired moves in separate lines as \"<src> <dst>\"; input empty line to proceed" << std::endl;
+    std::cout << "Input desired moves in separate lines as \"<src> <dst>\"; input blank line to proceed" << std::endl;
     while (std::getline(std::cin, line)) {
-        if (line.empty() or line == "\r") break;
         std::istringstream iss(line);
-        int src, dst;
-        iss >> src >> dst;
+        // Detect blank line and break
+        iss >> std::ws;
+        if (iss.eof()) break;
+        // Read and save what remains, checking for failure
+        int32_t src, dst;
+        if (!(iss >> src >> dst)) {
+            std::cerr << "Incorrect input, move not accepted - try again" << "\n";
+            std::cerr << "Rejected line: " << line << std::endl;
+            continue;
+        }
+        // Check for any trailing characters and reject the input
+        iss >> std::ws;
+        if (!iss.eof()) {
+            std::cerr << "Unexpected trailing characters - try again" << "\n";
+            std::cerr << "Rejected line: " << line << std::endl;
+            continue;
+        }
         src_vec.push_back(src);
         dst_vec.push_back(dst);
     }
 
     // Call the function selecting moves to keep and drop
     vector<uint8_t> kept_vec(src_vec.size());
-    const int32_t status = group_mover_select_moves(src_vec.data(), dst_vec.data(), src_vec.size(), kept_vec.data());
-    if (status != GROUP_MOVER_OK) {
-        std::cerr << "An error occurred" << std::endl;
+    const int32_t status_code = group_mover_select_moves(src_vec.data(), dst_vec.data(), src_vec.size(), kept_vec.data());
+    if (status_code != GROUP_MOVER_OK) {
+        const char* status_str = group_mover_status_string(status_code);
+        std::cerr << "An error occurred: " << status_str << std::endl;
         return 1;
     }
 

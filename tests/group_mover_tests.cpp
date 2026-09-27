@@ -30,7 +30,8 @@ namespace {
 
     void fail(const std::string& name, const vector<move>& moves, const std::string& reason) {
         failures++;
-        std::printf("FAIL %s %s: %s\n", name.c_str(), describe(moves).c_str(), reason.c_str());
+        const std::string shown_moves = moves.empty() ? "" : " " + describe(moves);
+        std::printf("FAIL %s%s: %s\n", name.c_str(), shown_moves.c_str(), reason.c_str());
     }
 
     // Returns true if every group receives as many kept moves as it sends
@@ -110,6 +111,27 @@ namespace {
         }
     }
 
+    void check_status_string(const int32_t status, const char* expected) {
+        const char* text = group_mover_status_string(status);
+        if (text == nullptr) {
+            fail("status string", {}, "status " + std::to_string(status) + " returned a null pointer");
+        }
+        else if (std::strcmp(text, expected) != 0) {
+            fail("status string", {}, "status " + std::to_string(status) + " returned \"" + text +
+                                      "\", expected \"" + expected + "\"");
+        }
+    }
+
+    void run_status_strings() {
+        check_status_string(GROUP_MOVER_OK, "ok");
+        check_status_string(GROUP_MOVER_NULL_ARGUMENT, "null argument");
+        check_status_string(GROUP_MOVER_INVALID_GROUP, "invalid group");
+        check_status_string(GROUP_MOVER_OUT_OF_MEMORY, "out of memory");
+        check_status_string(GROUP_MOVER_INTERNAL_ERROR, "internal error");
+        check_status_string(99, "unknown error");
+        check_status_string(-1, "unknown error");
+    }
+
     void run_examples() {
         check_exact("cycle with extra move", {{1, 2}, {2, 3}, {3, 1}, {1, 3}}, {1, 1, 1, 0});
         check_exact("pure cycle", {{1, 2}, {2, 3}, {3, 4}, {4, 1}}, {1, 1, 1, 1});
@@ -168,11 +190,12 @@ namespace {
 
 int main(int argc, char** argv) {
     if (argc != 2) {
-        std::printf("usage: %s examples|random\n", argv[0]);
+        std::printf("usage: %s examples|random|status_strings\n", argv[0]);
         return 2;
     }
     if (std::strcmp(argv[1], "examples") == 0) run_examples();
     else if (std::strcmp(argv[1], "random") == 0) run_random();
+    else if (std::strcmp(argv[1], "status_strings") == 0) run_status_strings();
     else {
         std::printf("unknown test set: %s\n", argv[1]);
         return 2;

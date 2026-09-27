@@ -28,3 +28,4 @@ target_compile_options(group_mover_tests PRIVATE ${GROUP_MOVER_WARNINGS})
 
 add_test(NAME examples COMMAND group_mover_tests examples)
 add_test(NAME random COMMAND group_mover_tests random)
+add_test(NAME status_strings COMMAND group_mover_tests status_strings)

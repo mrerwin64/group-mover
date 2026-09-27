@@ -24,9 +24,11 @@ namespace {
         vector<vector<size_t>> outgoing;
         vector<int> balance;
 
-        explicit flow_network(const size_t node_count):
-            outgoing(node_count),
-            balance(node_count, 0) {}
+        size_t add_node() {
+            outgoing.emplace_back();
+            balance.push_back(0);
+            return balance.size() - 1;
+        }
 
         size_t add_edge(const size_t src, const size_t dst, const int cap, const int cost) {
             outgoing[src].push_back(edges.size());
@@ -119,23 +121,37 @@ namespace {
     }
 
     void select_moves(const int32_t* src, const int32_t* dst, const size_t move_count, uint8_t* keep) {
-        // Map group numbers to node indexes
+        // Create the flow network, as well as group_id -> node_id and move_id -> edge_id maps
+        flow_network network;
         unordered_map<int32_t, size_t> group_map;
+        group_map.reserve(move_count * 2);
+        vector<size_t> move_map;
+        move_map.reserve(move_count);
+
         for (size_t i = 0; i < move_count; i++) {
-            group_map.try_emplace(src[i], group_map.size());
-            group_map.try_emplace(dst[i], group_map.size());
-        }
-        const size_t node_count = group_map.size();
-        
-        // Create the network and map move indexes to edge indexes
-        flow_network network(node_count);
-        vector<size_t> move_map(move_count);
-        for (size_t i = 0; i < move_count; i++) {
-            const size_t source = group_map.at(src[i]);
-            const size_t destination = group_map.at(dst[i]);
+            // For both groups either get their mapped node's id, or create the node and map it
+            size_t source;
+            if (const auto it = group_map.find(src[i]); it != group_map.end()) {
+                source = it->second;
+            }
+            else {
+                source = network.add_node();
+                group_map.emplace(src[i], source);
+            }
+
+            size_t destination;
+            if (const auto it = group_map.find(dst[i]); it != group_map.end()) {
+                destination = it -> second;
+            }
+            else {
+                destination = network.add_node();
+                group_map.emplace(dst[i], destination);
+            }
+
+            // Add the edge and insert its id into the move map
+            move_map.push_back(network.add_edge(source, destination, 1, 1));
             network.balance[source] += 1;
             network.balance[destination] -= 1;
-            move_map[i] = network.add_edge(source, destination, 1, 1);
         }
 
         // Balance all nodes in the network

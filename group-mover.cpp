@@ -50,11 +50,14 @@ namespace {
         const size_t node_count = network.balance.size();
         spfa_result result(node_count);
         result.cost[source] = 0;
+        vector<bool> in_queue(node_count, false);
+        in_queue[source] = true;
         queue<size_t> next;
         next.push(source);
 
         while (!next.empty()) {
             const size_t current_node = next.front();
+            in_queue[current_node] = false;
             next.pop();
             // Check all outgoing edges with capacity > 0 for creating a cheaper path to a node
             for (const size_t current_edge: network.outgoing[current_node]) {
@@ -65,7 +68,10 @@ namespace {
                 if (new_cost < result.cost[target_node]) {
                     result.prev_edge[target_node] = current_edge;
                     result.cost[target_node] = new_cost;
-                    next.push(target_node);
+                    if (!in_queue[target_node]) {
+                        in_queue[target_node] = true;
+                        next.push(target_node);
+                    }
                 }
             }
         }
@@ -112,7 +118,7 @@ namespace {
         }
     }
 
-    void implementation(const int32_t* src, const int32_t* dst, const size_t move_count, uint8_t* keep) {
+    void select_moves(const int32_t* src, const int32_t* dst, const size_t move_count, uint8_t* keep) {
         // Map group numbers to node indexes
         unordered_map<int32_t, size_t> group_map;
         for (size_t i = 0; i < move_count; i++) {
@@ -148,7 +154,7 @@ extern "C" int32_t group_mover_select_moves(const int32_t* src, const int32_t* d
     if (src == nullptr || dst == nullptr || keep == nullptr) return GROUP_MOVER_NULL_ARGUMENT;
     // Call the implementation
     try {
-        implementation(src, dst, move_count, keep);
+        select_moves(src, dst, move_count, keep);
     }
     catch (const std::bad_alloc&) {
         return GROUP_MOVER_OUT_OF_MEMORY;

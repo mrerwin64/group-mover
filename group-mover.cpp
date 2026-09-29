@@ -137,10 +137,18 @@ namespace {
         vector<size_t> move_map;
         move_map.reserve(moves.size());
 
-        // Create group nodes
+        // Create the slack node
+        const size_t slack_node = network.add_node();
+        // Create group nodes and edges to the slack node
         for (const group_mover_group& current_group: groups) {
-            const size_t node_id = network.add_node();
-            group_map.emplace(current_group.id, node_id);
+            const size_t group_node = network.add_node();
+            group_map.emplace(current_group.id, group_node);
+            // Add edge which allows the group to shrink
+            const size_t max_shrink = current_group.current_size - current_group.min_size;
+            network.add_edge(group_node, slack_node, static_cast<int>(max_shrink), 1);
+            // Add edge which allows the group to grow
+            const size_t max_grow = current_group.max_size - current_group.current_size;
+            network.add_edge(slack_node, group_node, static_cast<int>(max_grow), 1);
         }
 
         // Create move (person) nodes and edges connecting them to source and destination nodes
@@ -148,13 +156,13 @@ namespace {
             const size_t move_node = network.add_node();
             const size_t src_node = group_map.at(current_move.src);
             // Create source -> move edge and save it in the move map
-            const size_t source_edge = network.add_edge(src_node, move_node, 1, 1);
+            const size_t source_edge = network.add_edge(src_node, move_node, 1, 2);
             move_map.push_back(source_edge);
             // Create move -> destination edges, dropping all but the first one
             bool first = true;
             size_t first_edge = no_edge;
             for (const int32_t dst_node: span(current_move.dst, current_move.dst_count)) {
-                const size_t new_edge = network.add_edge(move_node, group_map.at(dst_node), 1, 1);
+                const size_t new_edge = network.add_edge(move_node, group_map.at(dst_node), 1, 2);
                 if (first) {
                     first_edge = new_edge;
                     first = false;
@@ -189,9 +197,9 @@ namespace {
                 // For normal edges, check if they are active
                 if (network.edges[destination_edge].capacity == 1) {
                     const size_t destination_node = network.edges[destination_edge].destination;
-                    // Since group nodes are created first and in order,
-                    // their indexes in the network and the input array are identical
-                    assignments[i] = groups[destination_node].id;
+                    // Since group nodes are created after the single slack node and in order,
+                    // their indexes in the network are higher by exactly one than in the input array
+                    assignments[i] = groups[destination_node - 1].id;
                 }
             }
         }
@@ -207,13 +215,14 @@ extern "C" int32_t group_mover_select_moves(const group_mover_group* groups, con
     if (group_count == 0) return GROUP_MOVER_NO_GROUPS;
     // Return an error if null pointers were provided as an argument
     if (groups == nullptr || moves == nullptr || assignments == nullptr) return GROUP_MOVER_NULL_ARGUMENT;
-    // Create a list of valid group ids and check for groups with too little or too many members
+    // Create a list of valid group ids and check for groups with too little or too many members, or too large max_size
     unordered_set<int32_t> group_ids;
     for (size_t i = 0; i < group_count; i++) {
         const auto& [group_id, min_size, current_size, max_size] = groups[i];
         if (current_size < min_size || current_size > max_size) {
             return GROUP_MOVER_INVALID_GROUP;
         }
+        if (max_size > std::numeric_limits<int32_t>::max()) return GROUP_MOVER_INVALID_GROUP;
         if (!group_ids.insert(group_id).second) return GROUP_MOVER_INVALID_GROUP;
     }
     // Check if each move has at least one destination, no destination == source, and doesn't reference invalid groups

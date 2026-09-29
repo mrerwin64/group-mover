@@ -22,7 +22,8 @@ extern "C" {
 enum {
     GROUP_MOVER_OK = 0,
     GROUP_MOVER_NULL_ARGUMENT = 1,      // groups, moves, assignments, or a move's dst (with dst_count > 0) was null
-    GROUP_MOVER_INVALID_GROUP = 2,      // A group's current_size is outside [min_size, max_size], or a group is listed twice
+    GROUP_MOVER_INVALID_GROUP = 2,      // A group's current_size is outside [min_size, max_size], max_size exceeds INT32_MAX,
+                                        // or a group is listed twice
     GROUP_MOVER_OUT_OF_MEMORY = 3,
     GROUP_MOVER_INTERNAL_ERROR = 4,     // A bug in the library
     GROUP_MOVER_NO_DESTINATION = 5,     // A move has dst_count == 0
@@ -46,10 +47,9 @@ typedef struct {
     size_t max_size;
 } group_mover_group;
 
-// Chooses which moves to carry out so that every group keeps its current size,
-// moving as many people as possible.
-// Not yet implemented: letting sizes vary within [min_size, max_size] (the bounds are only validated),
-// and using seed to decide between equally good choices (it is currently ignored).
+// Chooses which moves to carry out so that every group ends with a size within [min_size, max_size].
+// It moves as many people as possible, and among those choices changes group sizes as little as possible.
+// Not yet implemented: using seed to decide between equally good choices (it is currently ignored).
 //
 // groups       group_count groups; every group used by a move must be listed
 // moves        move_count moves, one per person

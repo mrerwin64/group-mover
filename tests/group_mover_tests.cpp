@@ -20,12 +20,7 @@ namespace {
         vector<int32_t> dst;
     };
 
-    // The library's inputs, flattened the way the C API expects them
-    struct flat_input {
-        vector<int32_t> src;
-        vector<size_t> dst_counts;
-        vector<int32_t> dst;
-    };
+    constexpr uint64_t test_seed = 12345;
 
     int failures = 0;
 
@@ -58,14 +53,30 @@ namespace {
         std::printf("FAIL %s%s: %s\n", name.c_str(), shown_moves.c_str(), reason.c_str());
     }
 
-    flat_input flatten(const vector<move>& moves) {
-        flat_input input;
+    // Every group used by the moves, with bounds that keep its size fixed.
+    // The current size is the number of people leaving it, the smallest size consistent with the moves.
+    vector<group_mover_group> rigid_groups(const vector<move>& moves) {
+        std::map<int32_t, size_t> sizes;
         for (const move& m : moves) {
-            input.src.push_back(m.src);
-            input.dst_counts.push_back(m.dst.size());
-            input.dst.insert(input.dst.end(), m.dst.begin(), m.dst.end());
+            sizes[m.src] += 1;
+            for (const int32_t d : m.dst) sizes.try_emplace(d, 0);
         }
-        return input;
+        vector<group_mover_group> groups;
+        for (const auto& [id, size] : sizes) groups.push_back({id, size, size, size});
+        return groups;
+    }
+
+    // The moves as the C API expects them. They point into moves, which must outlive the result.
+    vector<group_mover_move> api_moves(const vector<move>& moves) {
+        vector<group_mover_move> result;
+        for (const move& m : moves) result.push_back({m.src, m.dst.data(), m.dst.size()});
+        return result;
+    }
+
+    int32_t run(const vector<group_mover_group>& groups, const vector<move>& moves, vector<int32_t>& result) {
+        const vector<group_mover_move> c_moves = api_moves(moves);
+        return group_mover_select_moves(groups.data(), groups.size(), c_moves.data(), c_moves.size(),
+                                        test_seed, result.data());
     }
 
     // A group number that appears nowhere in the input, used to pre-fill result
@@ -131,15 +142,12 @@ namespace {
         return best;
     }
 
-    // Runs the library and checks that the result is valid and moves as many people as possible.
-    // Returns the result so callers can check for a specific answer.
-    vector<int32_t> check(const std::string& name, const vector<move>& moves) {
-        const flat_input input = flatten(moves);
-        const int32_t sentinel = unused_group(moves);
-        vector<int32_t> result(moves.size(), sentinel);
-
-        const int32_t status = group_mover_select_moves(input.src.data(), input.dst_counts.data(), input.dst.data(),
-                                                        moves.size(), result.data());
+    // Runs the library and checks that the result is valid, moves as many people as possible,
+    // and is the same when run again with the same seed. Returns the result so callers can check
+    // for a specific answer.
+    vector<int32_t> check(const std::string& name, const vector<move>& moves, const vector<group_mover_group>& groups) {
+        vector<int32_t> result(moves.size(), unused_group(moves));
+        const int32_t status = run(groups, moves, result);
         if (status != GROUP_MOVER_OK) {
             fail(name, moves, "returned status " + std::to_string(status));
             return result;
@@ -163,24 +171,36 @@ namespace {
         if (moved != best) {
             fail(name, moves, "moved " + std::to_string(moved) + " people, best is " + std::to_string(best));
         }
+
+        vector<int32_t> again(moves.size(), unused_group(moves));
+        if (run(groups, moves, again) != GROUP_MOVER_OK || again != result) {
+            fail(name, moves, "a second run with the same seed gave a different result");
+        }
         return result;
     }
 
-    void check_exact(const std::string& name, const vector<move>& moves, const vector<int32_t>& expected) {
-        const vector<int32_t> result = check(name, moves);
+    vector<int32_t> check(const std::string& name, const vector<move>& moves) {
+        return check(name, moves, rigid_groups(moves));
+    }
+
+    void check_exact(const std::string& name, const vector<move>& moves, const vector<group_mover_group>& groups,
+                     const vector<int32_t>& expected) {
+        const vector<int32_t> result = check(name, moves, groups);
         if (result != expected) {
             fail(name, moves, "result " + describe(result) + ", expected " + describe(expected));
         }
     }
 
+    void check_exact(const std::string& name, const vector<move>& moves, const vector<int32_t>& expected) {
+        check_exact(name, moves, rigid_groups(moves), expected);
+    }
+
     // Checks that invalid input is rejected with the expected status and that result is left untouched
-    void check_rejected(const std::string& name, const vector<move>& moves, const int32_t expected) {
-        const flat_input input = flatten(moves);
+    void check_rejected(const std::string& name, const vector<move>& moves, const vector<group_mover_group>& groups,
+                        const int32_t expected) {
         const int32_t sentinel = unused_group(moves);
         vector<int32_t> result(moves.size(), sentinel);
-
-        const int32_t status = group_mover_select_moves(input.src.data(), input.dst_counts.data(), input.dst.data(),
-                                                        moves.size(), result.data());
+        const int32_t status = run(groups, moves, result);
         if (status != expected) {
             fail(name, moves, "returned status " + std::to_string(status) + ", expected " + std::to_string(expected));
         }
@@ -189,9 +209,14 @@ namespace {
         }
     }
 
-    void check_status(const std::string& name, const int32_t* src, const size_t* dst_counts, const int32_t* dst,
-                      const size_t move_count, int32_t* result, const int32_t expected) {
-        const int32_t status = group_mover_select_moves(src, dst_counts, dst, move_count, result);
+    void check_rejected(const std::string& name, const vector<move>& moves, const int32_t expected) {
+        check_rejected(name, moves, rigid_groups(moves), expected);
+    }
+
+    void check_status(const std::string& name, const group_mover_group* groups, const size_t group_count,
+                      const group_mover_move* moves, const size_t move_count, int32_t* result,
+                      const int32_t expected) {
+        const int32_t status = group_mover_select_moves(groups, group_count, moves, move_count, test_seed, result);
         if (status != expected) {
             fail(name, {}, "returned status " + std::to_string(status) + ", expected " + std::to_string(expected));
         }
@@ -216,6 +241,8 @@ namespace {
         check_status_string(GROUP_MOVER_INTERNAL_ERROR, "internal error");
         check_status_string(GROUP_MOVER_NO_DESTINATION, "move with no destination");
         check_status_string(GROUP_MOVER_SELF_MOVE, "move with destination equal to source");
+        check_status_string(GROUP_MOVER_INVALID_MOVE, "invalid move");
+        check_status_string(GROUP_MOVER_NO_GROUPS, "no groups");
         check_status_string(99, "unknown error");
         check_status_string(-1, "unknown error");
     }
@@ -247,25 +274,52 @@ namespace {
         constexpr int32_t high = std::numeric_limits<int32_t>::max();
         check_exact("extreme group numbers", {{low, {high}}, {high, {low}}}, {high, low});
 
-        // Invalid input
+        // Group list
+        check_exact("groups listed in a different order than they are used",
+                    {{1, {2}}, {2, {3}}, {3, {1}}},
+                    {{3, 1, 1, 1}, {1, 1, 1, 1}, {2, 1, 1, 1}},
+                    {2, 3, 1});
+        check_exact("groups not used by any move",
+                    {{1, {2}}, {2, {1}}},
+                    {{7, 4, 4, 4}, {1, 1, 1, 1}, {8, 0, 0, 0}, {2, 1, 1, 1}},
+                    {2, 1});
+
+        // Invalid moves
         check_rejected("self move", {{3, {3}}}, GROUP_MOVER_SELF_MOVE);
         check_rejected("self move among other destinations", {{1, {2, 1, 3}}}, GROUP_MOVER_SELF_MOVE);
         check_rejected("self move in a later move", {{1, {2, 3}}, {2, {1}}, {4, {5, 4}}}, GROUP_MOVER_SELF_MOVE);
         check_rejected("no destinations", {{1, {2}}, {2, {}}}, GROUP_MOVER_NO_DESTINATION);
+        check_rejected("source not in groups", {{1, {2}}, {2, {1}}}, {{2, 1, 1, 1}}, GROUP_MOVER_INVALID_MOVE);
+        check_rejected("destination not in groups", {{1, {2, 3}}, {2, {1}}},
+                       {{1, 1, 1, 1}, {2, 1, 1, 1}}, GROUP_MOVER_INVALID_MOVE);
+        check_rejected("no groups", {{1, {2}}, {2, {1}}}, {}, GROUP_MOVER_NO_GROUPS);
 
-        int32_t src[] = {1};
-        size_t dst_counts[] = {1};
-        int32_t dst[] = {2};
+        // Invalid groups
+        check_rejected("current size below minimum", {{1, {2}}, {2, {1}}},
+                       {{1, 2, 1, 3}, {2, 1, 1, 1}}, GROUP_MOVER_INVALID_GROUP);
+        check_rejected("current size above maximum", {{1, {2}}, {2, {1}}},
+                       {{1, 1, 1, 1}, {2, 0, 2, 1}}, GROUP_MOVER_INVALID_GROUP);
+        check_rejected("group listed twice", {{1, {2}}, {2, {1}}},
+                       {{1, 1, 1, 1}, {2, 1, 1, 1}, {1, 1, 1, 1}}, GROUP_MOVER_INVALID_GROUP);
+
+        // Null pointers
+        const int32_t dst[] = {2};
+        group_mover_group groups[] = {{1, 1, 1, 1}, {2, 0, 0, 0}};
+        group_mover_group invalid_groups[] = {{1, 2, 1, 1}};
+        group_mover_move moves[] = {{1, dst, 1}};
+        group_mover_move null_dst_moves[] = {{1, nullptr, 1}};
         int32_t result[] = {0};
-        check_status("no moves", nullptr, nullptr, nullptr, 0, nullptr, GROUP_MOVER_OK);
-        check_status("null src", nullptr, dst_counts, dst, 1, result, GROUP_MOVER_NULL_ARGUMENT);
-        check_status("null dst_counts", src, nullptr, dst, 1, result, GROUP_MOVER_NULL_ARGUMENT);
-        check_status("null dst", src, dst_counts, nullptr, 1, result, GROUP_MOVER_NULL_ARGUMENT);
-        check_status("null result", src, dst_counts, dst, 1, nullptr, GROUP_MOVER_NULL_ARGUMENT);
+        check_status("no moves", nullptr, 0, nullptr, 0, nullptr, GROUP_MOVER_OK);
+        check_status("no moves, invalid groups ignored", invalid_groups, 1, nullptr, 0, nullptr, GROUP_MOVER_OK);
+        check_status("null groups", nullptr, 2, moves, 1, result, GROUP_MOVER_NULL_ARGUMENT);
+        check_status("null moves", groups, 2, nullptr, 1, result, GROUP_MOVER_NULL_ARGUMENT);
+        check_status("null result", groups, 2, moves, 1, nullptr, GROUP_MOVER_NULL_ARGUMENT);
+        check_status("null destinations", groups, 2, null_dst_moves, 1, result, GROUP_MOVER_NULL_ARGUMENT);
     }
 
     // Compares the library against brute force on many small random inputs,
-    // with groups numbered from 1, from 0, and scattered over the whole int32_t range
+    // with groups numbered from 1, from 0, and scattered over the whole int32_t range,
+    // and listed in a random order
     void run_random() {
         std::mt19937 rng(12345);
         std::uniform_int_distribution<int32_t> any_group(std::numeric_limits<int32_t>::min(),
@@ -275,26 +329,29 @@ namespace {
                 const int group_count = std::uniform_int_distribution(2, 6)(rng);
                 const int move_count = std::uniform_int_distribution(0, 8)(rng);
 
-                vector<int32_t> groups;
+                vector<int32_t> ids;
                 for (int g = 0; g < group_count; g++) {
-                    if (numbering == 0) groups.push_back(g + 1);
-                    else if (numbering == 1) groups.push_back(g);
-                    else groups.push_back(any_group(rng));
+                    if (numbering == 0) ids.push_back(g + 1);
+                    else if (numbering == 1) ids.push_back(g);
+                    else ids.push_back(any_group(rng));
                 }
 
                 vector<move> moves;
-                std::uniform_int_distribution<size_t> pick(0, groups.size() - 1);
+                std::uniform_int_distribution<size_t> pick(0, ids.size() - 1);
                 for (int i = 0; i < move_count; i++) {
-                    move m{groups[pick(rng)], {}};
+                    move m{ids[pick(rng)], {}};
                     const int dst_count = std::uniform_int_distribution(1, 3)(rng);
                     while (static_cast<int>(m.dst.size()) < dst_count) {
                         // Destinations may repeat, but never equal the source
-                        const int32_t d = groups[pick(rng)];
+                        const int32_t d = ids[pick(rng)];
                         if (d != m.src) m.dst.push_back(d);
                     }
                     moves.push_back(m);
                 }
-                check("random", moves);
+
+                vector<group_mover_group> groups = rigid_groups(moves);
+                std::shuffle(groups.begin(), groups.end(), rng);
+                check("random", moves, groups);
             }
         }
     }

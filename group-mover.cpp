@@ -1,14 +1,16 @@
 #include "group-mover.h"
 
 #include <unordered_map>
+#include <unordered_set>
 #include <stdexcept>
 #include <vector>
 #include <limits>
 #include <queue>
+#include <span>
 #include <new>
 
 namespace {
-    using std::vector, std::queue, std::unordered_map;
+    using std::vector, std::queue, std::unordered_map, std::span, std::unordered_set;
 
     constexpr size_t no_node = std::numeric_limits<size_t>::max();
     constexpr size_t no_edge = std::numeric_limits<size_t>::max();
@@ -127,109 +129,114 @@ namespace {
         }
     }
 
-    void select_moves(const int32_t* src, const size_t* dst_counts, const int32_t* dst, const size_t move_count, int32_t* result) {
+    void select_moves(span<const group_mover_group> groups, span<const group_mover_move> moves, [[maybe_unused]] const uint64_t seed, span<int32_t> assignments) {
         // Create the flow network, as well as group_id -> node_id and move_id -> edge_id maps
         flow_network network;
         unordered_map<int32_t, size_t> group_map;
+        group_map.reserve(groups.size());
         vector<size_t> move_map;
-        move_map.reserve(move_count);
+        move_map.reserve(moves.size());
 
-        size_t dst_pos = 0;
-        for (size_t i = 0; i < move_count; i++) { // Iterate over source groups (and at the same time moves)
-            // Get source node's mapped id, or create the node and map it
-            size_t source;
-            if (const auto it = group_map.find(src[i]); it != group_map.end()) {
-                source = it->second;
-            }
-            else {
-                source = network.add_node();
-                group_map.emplace(src[i], source);
-            }
+        // Create group nodes
+        for (const group_mover_group& current_group: groups) {
+            const size_t node_id = network.add_node();
+            group_map.emplace(current_group.id, node_id);
+        }
 
-            // Create the person node
-            const size_t person = network.add_node();
-            // Create an edge from source to person and map it to the i'th move
-            move_map.push_back(network.add_edge(source, person, 1, 1));
-
-            for (size_t j = 0; j < dst_counts[i]; j++) { // Run loop once for each possible destination
-                // Get destination node's mapped id, or create the node and map it
-                size_t destination;
-                if (const auto it = group_map.find(dst[dst_pos]); it != group_map.end()) {
-                    destination = it->second;
+        // Create move (person) nodes and edges connecting them to source and destination nodes
+        for (const group_mover_move& current_move: moves) {
+            const size_t move_node = network.add_node();
+            const size_t src_node = group_map.at(current_move.src);
+            // Create source -> move edge and save it in the move map
+            const size_t source_edge = network.add_edge(src_node, move_node, 1, 1);
+            move_map.push_back(source_edge);
+            // Create move -> destination edges, dropping all but the first one
+            bool first = true;
+            size_t first_edge = no_edge;
+            for (const int32_t dst_node: span(current_move.dst, current_move.dst_count)) {
+                const size_t new_edge = network.add_edge(move_node, group_map.at(dst_node), 1, 1);
+                if (first) {
+                    first_edge = new_edge;
+                    first = false;
                 }
                 else {
-                    destination = network.add_node();
-                    group_map.emplace(dst[dst_pos], destination);
+                    network.push_flow(new_edge);
                 }
-                // Create an edge from person to destination and immediately push flow along it (drop it)
-                const size_t dst_edge = network.add_edge(person, destination, 1, 1);
-                network.push_flow(dst_edge);
-                // Iterate over destination array
-                dst_pos++;
             }
-            const size_t kept_edge = network.edges.size() - 2; // The normal edge
-            // Push flow along twin of last normal edge to undrop it - arbitrary but convenient
-            network.push_flow(kept_edge ^ 1);
-
-            // Set balances for source and destination node - person nodes always have balance = 0
-            network.balance[source] += 1;
-            network.balance[network.edges[kept_edge].destination] -= 1;
+            // Set balances for source and destination nodes
+            network.balance[src_node] += 1;
+            network.balance[network.edges[first_edge].destination] -= 1;
         }
 
         // Balance all nodes in the network
         balance_network(network);
 
-        // Write the results into result
-        dst_pos = 0;
-        for (size_t i = 0; i < move_count; i++) {
+        // Write each person's final group into assignments
+        for (size_t i = 0; i < assignments.size(); i++) {
             const size_t person_edge = move_map[i];
 
-            // Put source node in result if the move was completely dropped - the person remains there
+            // Put the source group in assignments if the move was completely dropped - the person remains there
             if (network.edges[person_edge].capacity == 0) {
-                result[i] = src[i];
-                dst_pos += dst_counts[i];
+                assignments[i] = moves[i].src;
                 continue;
             }
 
+            // Check where the person ended up otherwise
             const size_t person_node = network.edges[person_edge].destination;
-            for (size_t destination_edge: network.outgoing[person_node]) {
-                // Skip twin edges completely
+            for (const size_t destination_edge: network.outgoing[person_node]) {
+                // Completely ignore twin edges (odd indexes)
                 if (destination_edge % 2 == 1) continue;
-
-                // Check if the edge is undropped
-                if (network.edges[destination_edge].capacity == 1) result[i] = dst[dst_pos];
-
-                dst_pos++; // Increment the dst position only if a non-twin edge was considered
+                // For normal edges, check if they are active
+                if (network.edges[destination_edge].capacity == 1) {
+                    const size_t destination_node = network.edges[destination_edge].destination;
+                    // Since group nodes are created first and in order,
+                    // their indexes in the network and the input array are identical
+                    assignments[i] = groups[destination_node].id;
+                }
             }
         }
     }
 }
 
-extern "C" int32_t group_mover_select_moves(const int32_t* src, const size_t* dst_counts, const int32_t* dst, const size_t move_count, int32_t* result) {
+extern "C" int32_t group_mover_select_moves(const group_mover_group* groups, const size_t group_count,
+    const group_mover_move* moves, const size_t move_count,
+    const uint64_t seed, int32_t* assignments) try {
     // Instantly return if there are no moves
     if (move_count == 0) return GROUP_MOVER_OK;
-    // Return error if null pointers were provided
-    if (src == nullptr || dst_counts == nullptr || dst == nullptr || result == nullptr) return GROUP_MOVER_NULL_ARGUMENT;
-    // Check for self-moves or moves with no destination
-    size_t dst_pos = 0;
+    // Return an error if there are no groups (but there are moves)
+    if (group_count == 0) return GROUP_MOVER_NO_GROUPS;
+    // Return an error if null pointers were provided as an argument
+    if (groups == nullptr || moves == nullptr || assignments == nullptr) return GROUP_MOVER_NULL_ARGUMENT;
+    // Create a list of valid group ids and check for groups with too little or too many members
+    unordered_set<int32_t> group_ids;
+    for (size_t i = 0; i < group_count; i++) {
+        const auto& [group_id, min_size, current_size, max_size] = groups[i];
+        if (current_size < min_size || current_size > max_size) {
+            return GROUP_MOVER_INVALID_GROUP;
+        }
+        if (!group_ids.insert(group_id).second) return GROUP_MOVER_INVALID_GROUP;
+    }
+    // Check if each move has at least one destination, no destination == source, and doesn't reference invalid groups
     for (size_t i = 0; i < move_count; i++) {
-        if (dst_counts[i] == 0) return GROUP_MOVER_NO_DESTINATION;
-        for (size_t j = 0; j < dst_counts[i]; j++) {
-            if (src[i] == dst[dst_pos]) return GROUP_MOVER_SELF_MOVE;
-            dst_pos++;
+        const auto& [src, dst_arr, dst_count] = moves[i];
+        if (!group_ids.contains(src)) return GROUP_MOVER_INVALID_MOVE;
+        if (dst_count == 0) return GROUP_MOVER_NO_DESTINATION;
+        if (dst_arr == nullptr) return GROUP_MOVER_NULL_ARGUMENT;
+        for (size_t j = 0; j < dst_count; j++) {
+            const int32_t dst = dst_arr[j];
+            if (dst == src) return GROUP_MOVER_SELF_MOVE;
+            if (!group_ids.contains(dst)) return GROUP_MOVER_INVALID_MOVE;
         }
     }
-    // Call the implementation
-    try {
-        select_moves(src, dst_counts, dst, move_count, result);
-    }
-    catch (const std::bad_alloc&) {
-        return GROUP_MOVER_OUT_OF_MEMORY;
-    }
-    catch (...) {
-        return GROUP_MOVER_INTERNAL_ERROR;
-    }
+    // Call the implementation using std::span
+    select_moves({groups, group_count}, {moves, move_count}, seed, {assignments, move_count});
     return GROUP_MOVER_OK;
+}
+catch (const std::bad_alloc&) {
+    return GROUP_MOVER_OUT_OF_MEMORY;
+}
+catch (...) {
+    return GROUP_MOVER_INTERNAL_ERROR;
 }
 
 extern "C" const char* group_mover_status_string(const int32_t status_code) {
@@ -241,6 +248,8 @@ extern "C" const char* group_mover_status_string(const int32_t status_code) {
         case GROUP_MOVER_INTERNAL_ERROR: return "internal error";
         case GROUP_MOVER_NO_DESTINATION: return "move with no destination";
         case GROUP_MOVER_SELF_MOVE: return "move with destination equal to source";
+        case GROUP_MOVER_INVALID_MOVE: return "invalid move";
+        case GROUP_MOVER_NO_GROUPS: return "no groups";
         default: return "unknown error";
     }
 }

@@ -90,10 +90,11 @@ namespace {
         return result;
     }
 
-    int32_t run(const vector<group_mover_group>& groups, const vector<move>& moves, vector<int32_t>& assignments) {
+    int32_t run(const vector<group_mover_group>& groups, const vector<move>& moves, vector<int32_t>& assignments,
+                const uint64_t seed = test_seed) {
         const vector<group_mover_move> c_moves = api_moves(moves);
         return group_mover_select_moves(groups.data(), groups.size(), c_moves.data(), c_moves.size(),
-                                        test_seed, assignments.data());
+                                        seed, assignments.data());
     }
 
     // A group number that appears nowhere in the input, used to pre-fill assignments
@@ -376,6 +377,46 @@ namespace {
         check_status("null destinations", groups, 2, null_dst_moves, 1, assignments, GROUP_MOVER_NULL_ARGUMENT);
     }
 
+    // Runs the same input with many seeds and checks that each person in `contenders` gets their wanted group
+    // in a fair share of the runs. Only one of them can, so each should win about 1 / contenders.size() of the time.
+    void check_fair(const std::string& name, const vector<move>& moves, const vector<group_mover_group>& groups,
+                    const vector<size_t>& contenders, const vector<int32_t>& wanted) {
+        constexpr int runs = 500;
+        vector<int> wins(contenders.size(), 0);
+        for (int seed = 0; seed < runs; seed++) {
+            vector<int32_t> assignments(moves.size());
+            if (run(groups, moves, assignments, static_cast<uint64_t>(seed)) != GROUP_MOVER_OK) {
+                fail(name, moves, "returned an error for seed " + std::to_string(seed));
+                return;
+            }
+            for (size_t c = 0; c < contenders.size(); c++) {
+                if (assignments[contenders[c]] == wanted[c]) wins[c]++;
+            }
+        }
+        // Expected share is 1/n; allow half to one and a half of it, far outside random variation at 500 runs
+        const double expected = static_cast<double>(runs) / static_cast<double>(contenders.size());
+        for (size_t c = 0; c < contenders.size(); c++) {
+            if (wins[c] < expected * 0.5 || wins[c] > expected * 1.5) {
+                fail(name, moves, "person " + std::to_string(contenders[c]) + " won " + std::to_string(wins[c]) +
+                                  " of " + std::to_string(runs) + " runs, expected about " +
+                                  std::to_string(static_cast<int>(expected)));
+            }
+        }
+    }
+
+    // Checks that ties are decided by the seed, not by the order of the input
+    void run_fairness() {
+        // Five people in the same group want the one free spot: decided by move order without shuffling
+        check_fair("identical requests", {{1, {2}}, {1, {2}}, {1, {2}}, {1, {2}}, {1, {2}}, {2, {1}}},
+                   {{1, 5, 5, 5}, {2, 1, 1, 1}}, {0, 1, 2, 3, 4}, {2, 2, 2, 2, 2});
+        // People from different groups want the one free spot in group 1: decided by group order without shuffling
+        check_fair("requests from different groups", {{2, {1}}, {3, {1}}},
+                   {{1, 15, 15, 16}, {2, 14, 15, 15}, {3, 14, 15, 15}}, {0, 1}, {1, 1});
+        // Person 0 can swap with either person 1 or person 2: decided by person 0's first option without shuffling
+        check_fair("another person's options", {{1, {2, 3}}, {2, {1}}, {3, {1}}},
+                   {{1, 1, 1, 1}, {2, 1, 1, 1}, {3, 1, 1, 1}}, {1, 2}, {1, 1});
+    }
+
     // Compares the library against brute force on many small random inputs,
     // with groups numbered from 1, from 0, and scattered over the whole int32_t range,
     // listed in a random order, and every other input allowing group sizes to change
@@ -428,11 +469,12 @@ namespace {
 
 int main(int argc, char** argv) {
     if (argc != 2) {
-        std::printf("usage: %s examples|random|status_strings\n", argv[0]);
+        std::printf("usage: %s examples|random|fairness|status_strings\n", argv[0]);
         return 2;
     }
     if (std::strcmp(argv[1], "examples") == 0) run_examples();
     else if (std::strcmp(argv[1], "random") == 0) run_random();
+    else if (std::strcmp(argv[1], "fairness") == 0) run_fairness();
     else if (std::strcmp(argv[1], "status_strings") == 0) run_status_strings();
     else {
         std::printf("unknown test set: %s\n", argv[1]);

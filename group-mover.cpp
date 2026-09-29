@@ -5,6 +5,7 @@
 #include <stdexcept>
 #include <vector>
 #include <limits>
+#include <random>
 #include <queue>
 #include <span>
 #include <new>
@@ -129,18 +130,32 @@ namespace {
         }
     }
 
-    void select_moves(span<const group_mover_group> groups, span<const group_mover_move> moves, [[maybe_unused]] const uint64_t seed, span<int32_t> assignments) {
+    template <typename T>
+    void shuffle(vector<T>& values, std::mt19937_64& rng) {
+        for (size_t i = values.size(); i > 1; --i) {
+            std::swap(values[i - 1], values[rng() % i]);
+        }
+    }
+
+    void select_moves(span<const group_mover_group> groups, span<const group_mover_move> moves, const uint64_t seed, span<int32_t> assignments) {
+        // Create the random number generator
+        std::mt19937_64 rng(seed);
+
+        // Shuffle the group span, as nodes are evaluated in order based on their index
+        vector<group_mover_group> groups_shuffled(groups.begin(), groups.end());
+        shuffle(groups_shuffled, rng);
+
         // Create the flow network, as well as group_id -> node_id and move_id -> edge_id maps
         flow_network network;
         unordered_map<int32_t, size_t> group_map;
-        group_map.reserve(groups.size());
+        group_map.reserve(groups_shuffled.size());
         vector<size_t> move_map;
         move_map.reserve(moves.size());
 
         // Create the slack node
         const size_t slack_node = network.add_node();
         // Create group nodes and edges to the slack node
-        for (const group_mover_group& current_group: groups) {
+        for (const group_mover_group& current_group: groups_shuffled) {
             const size_t group_node = network.add_node();
             group_map.emplace(current_group.id, group_node);
             // Add edge which allows the group to shrink
@@ -158,22 +173,25 @@ namespace {
             // Create source -> move edge and save it in the move map
             const size_t source_edge = network.add_edge(src_node, move_node, 1, 2);
             move_map.push_back(source_edge);
-            // Create move -> destination edges, dropping all but the first one
-            bool first = true;
+            // Create move -> destination edges, dropping all but a random one,
+            // as the edge that starts kept is more likely to remain that way
             size_t first_edge = no_edge;
             for (const int32_t dst_node: span(current_move.dst, current_move.dst_count)) {
                 const size_t new_edge = network.add_edge(move_node, group_map.at(dst_node), 1, 2);
-                if (first) {
-                    first_edge = new_edge;
-                    first = false;
-                }
-                else {
-                    network.push_flow(new_edge);
-                }
+                if (first_edge == no_edge) first_edge = new_edge;
+                network.push_flow(new_edge);
             }
+            const size_t kept_off = rng() % current_move.dst_count;
+            const size_t kept_edge = first_edge + 2 * kept_off;
+            network.push_flow(kept_edge ^ 1);
             // Set balances for source and destination nodes
             network.balance[src_node] += 1;
-            network.balance[network.edges[first_edge].destination] -= 1;
+            network.balance[network.edges[kept_edge].destination] -= 1;
+        }
+
+        // Shuffle outgoing vectors of each node, as edges are evaluated in order based on their index
+        for (auto& outgoing_entry: network.outgoing) {
+            shuffle(outgoing_entry, rng);
         }
 
         // Balance all nodes in the network
@@ -182,13 +200,11 @@ namespace {
         // Write each person's final group into assignments
         for (size_t i = 0; i < assignments.size(); i++) {
             const size_t person_edge = move_map[i];
-
             // Put the source group in assignments if the move was completely dropped - the person remains there
             if (network.edges[person_edge].capacity == 0) {
                 assignments[i] = moves[i].src;
                 continue;
             }
-
             // Check where the person ended up otherwise
             const size_t person_node = network.edges[person_edge].destination;
             for (const size_t destination_edge: network.outgoing[person_node]) {
@@ -197,9 +213,9 @@ namespace {
                 // For normal edges, check if they are active
                 if (network.edges[destination_edge].capacity == 1) {
                     const size_t destination_node = network.edges[destination_edge].destination;
-                    // Since group nodes are created after the single slack node and in order,
-                    // their indexes in the network are higher by exactly one than in the input array
-                    assignments[i] = groups[destination_node - 1].id;
+                    // Since group nodes are created after the single slack node and in shuffled order,
+                    // their indexes in the network are higher by exactly one than in the shuffled array
+                    assignments[i] = groups_shuffled[destination_node - 1].id;
                 }
             }
         }

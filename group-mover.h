@@ -49,11 +49,11 @@ typedef struct {
 
 // Chooses which moves to carry out so that every group ends with a size within [min_size, max_size].
 // It moves as many people as possible, and among those choices changes group sizes as little as possible.
-// Not yet implemented: using seed to decide between equally good choices (it is currently ignored).
+// Between equally good choices it picks randomly, so the order of groups and moves in the input doesn't matter.
 //
 // groups       group_count groups; every group used by a move must be listed
 // moves        move_count moves, one per person
-// seed         currently ignored; the result is deterministic for a given input
+// seed         drives the random choices; the same input and seed always give the same result
 // assignments  output, move_count entries, written only on GROUP_MOVER_OK: the group each person ends up in,
 //              i.e. one of their destinations, or their src if they stay
 //

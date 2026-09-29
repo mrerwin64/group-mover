@@ -9,8 +9,27 @@
 using std::vector;
 
 int main() {
-    // Get list of groups
+    // Get seed
     std::string line;
+    std::cout << "Input seed used to decide ties fairly" << std::endl;
+    std::getline(std::cin, line);
+    // Read the value
+    uint64_t seed;
+    {
+        std::istringstream iss(line);
+        if (!(iss >> seed)) {
+            std::cerr << "Failed to read input" << "\n";
+            return 1;
+        }
+        // Check for trailing characters
+        iss >> std::ws;
+        if (!iss.eof()) {
+            std::cerr << "Unexpected trailing characters" << "\n";
+            return 1;
+        }
+    } // Prevent the compiler complaining about shadowed values
+
+    // Get list of groups
     vector<group_mover_group> groups;
     std::cout << "Input groups in separate lines as \"<id> <min_size> <current_size> <max_size>\"; ";
     std::cout << "input blank line to proceed" << std::endl;
@@ -96,7 +115,7 @@ int main() {
         groups.size(),
         moves.data(),
         moves.size(),
-        0,
+        seed,
         assignments.data());
     if (status_code != GROUP_MOVER_OK) {
         const char* status_str = group_mover_status_string(status_code);

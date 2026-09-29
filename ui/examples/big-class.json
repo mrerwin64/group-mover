@@ -1,0 +1,614 @@
+{
+  "format": "group-mover-ui",
+  "version": 1,
+  "seed": "12345",
+  "groups": [
+    {
+      "id": "11",
+      "name": "Mon 08:00",
+      "min": "16",
+      "current": "18",
+      "max": "20"
+    },
+    {
+      "id": "12",
+      "name": "Mon 10:00",
+      "min": "12",
+      "current": "14",
+      "max": "16"
+    },
+    {
+      "id": "13",
+      "name": "Mon 12:00",
+      "min": "14",
+      "current": "16",
+      "max": "18"
+    },
+    {
+      "id": "14",
+      "name": "Mon 14:00",
+      "min": "16",
+      "current": "18",
+      "max": "20"
+    },
+    {
+      "id": "15",
+      "name": "Mon 16:00",
+      "min": "16",
+      "current": "18",
+      "max": "20"
+    },
+    {
+      "id": "21",
+      "name": "Tue 08:00",
+      "min": "14",
+      "current": "16",
+      "max": "18"
+    },
+    {
+      "id": "22",
+      "name": "Tue 10:00",
+      "min": "12",
+      "current": "14",
+      "max": "16"
+    },
+    {
+      "id": "23",
+      "name": "Tue 12:00",
+      "min": "16",
+      "current": "18",
+      "max": "20"
+    },
+    {
+      "id": "24",
+      "name": "Tue 14:00",
+      "min": "14",
+      "current": "16",
+      "max": "18"
+    },
+    {
+      "id": "25",
+      "name": "Tue 16:00",
+      "min": "15",
+      "current": "17",
+      "max": "19"
+    },
+    {
+      "id": "31",
+      "name": "Wed 08:00",
+      "min": "15",
+      "current": "17",
+      "max": "19"
+    },
+    {
+      "id": "32",
+      "name": "Wed 10:00",
+      "min": "12",
+      "current": "14",
+      "max": "16"
+    },
+    {
+      "id": "33",
+      "name": "Wed 12:00",
+      "min": "12",
+      "current": "14",
+      "max": "16"
+    },
+    {
+      "id": "34",
+      "name": "Wed 14:00",
+      "min": "12",
+      "current": "14",
+      "max": "16"
+    },
+    {
+      "id": "35",
+      "name": "Wed 16:00",
+      "min": "15",
+      "current": "17",
+      "max": "19"
+    }
+  ],
+  "moves": [
+    {
+      "name": "Ewa H.",
+      "src": "25",
+      "dst": "24 23 22"
+    },
+    {
+      "name": "Kasia D.",
+      "src": "15",
+      "dst": "13 14"
+    },
+    {
+      "name": "Iga Z.",
+      "src": "21",
+      "dst": "34"
+    },
+    {
+      "name": "Wojtek N.",
+      "src": "31",
+      "dst": "34"
+    },
+    {
+      "name": "Maja E.",
+      "src": "11",
+      "dst": "12 14"
+    },
+    {
+      "name": "Kasia N.",
+      "src": "15",
+      "dst": "14"
+    },
+    {
+      "name": "Ola B.",
+      "src": "15",
+      "dst": "14 13"
+    },
+    {
+      "name": "Weronika G.",
+      "src": "11",
+      "dst": "15 21"
+    },
+    {
+      "name": "Dawid S.",
+      "src": "35",
+      "dst": "34"
+    },
+    {
+      "name": "Ola I.",
+      "src": "13",
+      "dst": "14 23"
+    },
+    {
+      "name": "Natalia E.",
+      "src": "22",
+      "dst": "25"
+    },
+    {
+      "name": "Kasia R.",
+      "src": "23",
+      "dst": "22"
+    },
+    {
+      "name": "Łukasz W.",
+      "src": "34",
+      "dst": "33"
+    },
+    {
+      "name": "Jan A.",
+      "src": "11",
+      "dst": "13 31 14"
+    },
+    {
+      "name": "Staś D.",
+      "src": "25",
+      "dst": "24"
+    },
+    {
+      "name": "Weronika J.",
+      "src": "25",
+      "dst": "21 22"
+    },
+    {
+      "name": "Natalia A.",
+      "src": "21",
+      "dst": "24"
+    },
+    {
+      "name": "Paweł K.",
+      "src": "24",
+      "dst": "23 14"
+    },
+    {
+      "name": "Michał A.",
+      "src": "35",
+      "dst": "33 34 15"
+    },
+    {
+      "name": "Iga M.",
+      "src": "21",
+      "dst": "22"
+    },
+    {
+      "name": "Zofia J.",
+      "src": "24",
+      "dst": "22"
+    },
+    {
+      "name": "Adam R.",
+      "src": "34",
+      "dst": "33 32 24"
+    },
+    {
+      "name": "Ola E.",
+      "src": "31",
+      "dst": "34 33"
+    },
+    {
+      "name": "Lena E.",
+      "src": "21",
+      "dst": "24 23"
+    },
+    {
+      "name": "Magda H.",
+      "src": "11",
+      "dst": "13 15 12"
+    },
+    {
+      "name": "Wiktoria R.",
+      "src": "32",
+      "dst": "34"
+    },
+    {
+      "name": "Wiktoria M.",
+      "src": "25",
+      "dst": "23"
+    },
+    {
+      "name": "Michał K.",
+      "src": "22",
+      "dst": "24"
+    },
+    {
+      "name": "Adam P.",
+      "src": "13",
+      "dst": "33 14 12"
+    },
+    {
+      "name": "Igor I.",
+      "src": "35",
+      "dst": "33"
+    },
+    {
+      "name": "Mateusz Z.",
+      "src": "22",
+      "dst": "23"
+    },
+    {
+      "name": "Dawid G.",
+      "src": "21",
+      "dst": "23"
+    },
+    {
+      "name": "Tomek I.",
+      "src": "15",
+      "dst": "14"
+    },
+    {
+      "name": "Kuba J.",
+      "src": "34",
+      "dst": "32"
+    },
+    {
+      "name": "Jan P.",
+      "src": "32",
+      "dst": "33"
+    },
+    {
+      "name": "Kuba M.",
+      "src": "11",
+      "dst": "14"
+    },
+    {
+      "name": "Igor O.",
+      "src": "35",
+      "dst": "33"
+    },
+    {
+      "name": "Iga I.",
+      "src": "12",
+      "dst": "11"
+    },
+    {
+      "name": "Zuza E.",
+      "src": "11",
+      "dst": "12"
+    },
+    {
+      "name": "Łukasz F.",
+      "src": "24",
+      "dst": "23"
+    },
+    {
+      "name": "Michał G.",
+      "src": "24",
+      "dst": "25"
+    },
+    {
+      "name": "Iga K.",
+      "src": "15",
+      "dst": "13"
+    },
+    {
+      "name": "Kasia L.",
+      "src": "35",
+      "dst": "33"
+    },
+    {
+      "name": "Bartek T.",
+      "src": "15",
+      "dst": "14 13"
+    },
+    {
+      "name": "Bartek A.",
+      "src": "11",
+      "dst": "13 14"
+    },
+    {
+      "name": "Wojtek W.",
+      "src": "33",
+      "dst": "32"
+    },
+    {
+      "name": "Piotr H.",
+      "src": "35",
+      "dst": "33"
+    },
+    {
+      "name": "Adam K.",
+      "src": "13",
+      "dst": "14"
+    },
+    {
+      "name": "Emilia P.",
+      "src": "11",
+      "dst": "12"
+    },
+    {
+      "name": "Adam T.",
+      "src": "14",
+      "dst": "12"
+    },
+    {
+      "name": "Ola M.",
+      "src": "31",
+      "dst": "34"
+    },
+    {
+      "name": "Marek P.",
+      "src": "15",
+      "dst": "14"
+    },
+    {
+      "name": "Staś F.",
+      "src": "31",
+      "dst": "33 34 32"
+    },
+    {
+      "name": "Alicja N.",
+      "src": "25",
+      "dst": "22"
+    },
+    {
+      "name": "Weronika R.",
+      "src": "31",
+      "dst": "33"
+    },
+    {
+      "name": "Ewa J.",
+      "src": "21",
+      "dst": "23"
+    },
+    {
+      "name": "Oskar W.",
+      "src": "15",
+      "dst": "14 13"
+    },
+    {
+      "name": "Jan B.",
+      "src": "25",
+      "dst": "22"
+    },
+    {
+      "name": "Natalia F.",
+      "src": "14",
+      "dst": "34"
+    },
+    {
+      "name": "Iga S.",
+      "src": "31",
+      "dst": "34"
+    },
+    {
+      "name": "Michał R.",
+      "src": "25",
+      "dst": "23"
+    },
+    {
+      "name": "Mateusz B.",
+      "src": "25",
+      "dst": "23 24 22"
+    },
+    {
+      "name": "Tomek O.",
+      "src": "32",
+      "dst": "33 34"
+    },
+    {
+      "name": "Maja N.",
+      "src": "14",
+      "dst": "13 12"
+    },
+    {
+      "name": "Kamil F.",
+      "src": "33",
+      "dst": "31"
+    },
+    {
+      "name": "Michał E.",
+      "src": "21",
+      "dst": "22"
+    },
+    {
+      "name": "Mateusz L.",
+      "src": "12",
+      "dst": "33 14"
+    },
+    {
+      "name": "Alicja J.",
+      "src": "12",
+      "dst": "13"
+    },
+    {
+      "name": "Ola C.",
+      "src": "24",
+      "dst": "22 23 34"
+    },
+    {
+      "name": "Szymon G.",
+      "src": "35",
+      "dst": "31 34"
+    },
+    {
+      "name": "Agata A.",
+      "src": "31",
+      "dst": "33"
+    },
+    {
+      "name": "Oskar A.",
+      "src": "15",
+      "dst": "14 13"
+    },
+    {
+      "name": "Staś R.",
+      "src": "25",
+      "dst": "23 24"
+    },
+    {
+      "name": "Alicja E.",
+      "src": "25",
+      "dst": "23"
+    },
+    {
+      "name": "Iga H.",
+      "src": "21",
+      "dst": "24"
+    },
+    {
+      "name": "Nina T.",
+      "src": "33",
+      "dst": "32"
+    },
+    {
+      "name": "Mateusz R.",
+      "src": "11",
+      "dst": "12"
+    },
+    {
+      "name": "Zuza F.",
+      "src": "34",
+      "dst": "32"
+    },
+    {
+      "name": "Ola G.",
+      "src": "31",
+      "dst": "33 34"
+    },
+    {
+      "name": "Magda F.",
+      "src": "11",
+      "dst": "14 23 24"
+    },
+    {
+      "name": "Marek K.",
+      "src": "35",
+      "dst": "33 32"
+    },
+    {
+      "name": "Ola P.",
+      "src": "33",
+      "dst": "34"
+    },
+    {
+      "name": "Piotr Z.",
+      "src": "25",
+      "dst": "22 24"
+    },
+    {
+      "name": "Piotr K.",
+      "src": "11",
+      "dst": "13"
+    },
+    {
+      "name": "Bartek J.",
+      "src": "21",
+      "dst": "22"
+    },
+    {
+      "name": "Filip I.",
+      "src": "22",
+      "dst": "25"
+    },
+    {
+      "name": "Adam E.",
+      "src": "24",
+      "dst": "22"
+    },
+    {
+      "name": "Zofia S.",
+      "src": "35",
+      "dst": "32"
+    },
+    {
+      "name": "Adam H.",
+      "src": "22",
+      "dst": "21"
+    },
+    {
+      "name": "Tomek L.",
+      "src": "31",
+      "dst": "32"
+    },
+    {
+      "name": "Igor P.",
+      "src": "15",
+      "dst": "13 14"
+    },
+    {
+      "name": "Alicja D.",
+      "src": "31",
+      "dst": "32"
+    },
+    {
+      "name": "Mateusz G.",
+      "src": "21",
+      "dst": "22"
+    },
+    {
+      "name": "Alicja O.",
+      "src": "35",
+      "dst": "33"
+    },
+    {
+      "name": "Hania N.",
+      "src": "12",
+      "dst": "14 13"
+    },
+    {
+      "name": "Mateusz F.",
+      "src": "32",
+      "dst": "33"
+    },
+    {
+      "name": "Ula Z.",
+      "src": "31",
+      "dst": "35"
+    },
+    {
+      "name": "Magda L.",
+      "src": "15",
+      "dst": "14"
+    },
+    {
+      "name": "Julia N.",
+      "src": "32",
+      "dst": "34"
+    },
+    {
+      "name": "Bartek M.",
+      "src": "35",
+      "dst": "23"
+    }
+  ]
+}

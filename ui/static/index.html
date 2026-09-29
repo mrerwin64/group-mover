@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Group Mover</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='8' cy='16' r='6' fill='%232a78d6'/%3E%3Ccircle cx='24' cy='16' r='6' fill='%231baf7a'/%3E%3Cpath d='M13 12 Q16 8 19 12' stroke='%23888' stroke-width='2' fill='none'/%3E%3C/svg%3E">
+    <link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div id="error-banner" class="error-banner" role="alert" hidden></div>
+
+<header class="app-header">
+    <div class="brand">
+        <svg viewBox="0 0 32 32" width="26" height="26" aria-hidden="true">
+            <circle cx="8" cy="16" r="6" class="brand-a"/><circle cx="24" cy="16" r="6" class="brand-b"/>
+            <path d="M12.5 11.5 Q16 7 19.5 11.5" class="brand-arrow"/><path d="M19.5 20.5 Q16 25 12.5 20.5" class="brand-arrow"/>
+        </svg>
+        <span>Group Mover</span>
+    </div>
+    <div class="header-controls">
+        <label class="field compact" title="Load an example (replaces the current input)">
+            <span class="sr-only">Examples</span>
+            <select id="examples"><option value="">Examples…</option></select>
+        </label>
+        <div class="seed-box" title="The seed decides ties; the same input and seed always give the same result">
+            <label for="seed">Seed</label>
+            <input id="seed" type="text" inputmode="numeric" autocomplete="off" spellcheck="false">
+            <button id="seed-prev" type="button" class="icon" title="Previous seed" aria-label="Previous seed">&#8722;</button>
+            <button id="seed-next" type="button" class="icon" title="Next seed" aria-label="Next seed">+</button>
+            <button id="seed-random" type="button" class="icon" title="Random seed" aria-label="Random seed">&#9860;</button>
+        </div>
+        <button id="run" type="button" class="primary" title="Run the library (Ctrl+Enter)">Run</button>
+        <label class="check" title="Run again whenever the input changes"><input id="auto-run" type="checkbox"> Auto</label>
+        <span id="status" class="status-pill" aria-live="polite">Ready</span>
+        <button id="theme" type="button" class="icon" title="Theme: follow system" aria-label="Switch theme">&#9680;</button>
+    </div>
+</header>
+
+<main class="layout" id="layout">
+    <section class="pane pane-input" aria-label="Input">
+        <nav class="tabs" role="tablist" data-tabs="input">
+            <button role="tab" data-tab="groups">Groups <span class="count" id="groups-count"></span></button>
+            <button role="tab" data-tab="moves">Moves <span class="count" id="moves-count"></span></button>
+            <button role="tab" data-tab="io">Import / export</button>
+        </nav>
+        <div class="tab-panels">
+            <div role="tabpanel" data-panel="groups" class="panel">
+                <div class="toolbar">
+                    <button id="group-add" type="button">+ Group</button>
+                    <span class="toolbar-sep"></span>
+                    <label class="inline-field" title="Set every group's min and max to its current size minus and plus this much">
+                        Bounds current &#177; <input id="slack-k" type="number" min="0" value="1" class="tiny">
+                    </label>
+                    <button id="slack-apply" type="button" class="ghost">Apply</button>
+                    <span class="spacer"></span>
+                    <button id="group-sort" type="button" class="ghost" title="Sort groups by id">Sort</button>
+                    <button id="group-clear" type="button" class="ghost danger">Clear</button>
+                </div>
+                <div class="table-scroll editor-scroll">
+                    <table class="editor" id="groups-table">
+                        <thead><tr>
+                            <th scope="col">Id</th><th scope="col">Name</th><th scope="col" title="Smallest allowed size">Min</th>
+                            <th scope="col">Current</th><th scope="col" title="Largest allowed size">Max</th>
+                            <th scope="col"><span class="sr-only">Actions</span></th>
+                        </tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+                <p class="hint">Ids are any whole numbers; names are optional and can be used instead of ids when typing moves.</p>
+            </div>
+            <div role="tabpanel" data-panel="moves" class="panel">
+                <div class="toolbar">
+                    <button id="move-add" type="button">+ Move</button>
+                    <input id="move-filter" type="search" class="search" placeholder="Filter" aria-label="Filter moves">
+                    <span class="spacer"></span>
+                    <button id="move-clear" type="button" class="ghost danger">Clear</button>
+                </div>
+                <div class="table-scroll editor-scroll">
+                    <table class="editor" id="moves-table">
+                        <thead><tr>
+                            <th scope="col">#</th><th scope="col">Person</th><th scope="col">From</th>
+                            <th scope="col" title="Any of these; separate with spaces or /, mark a favourite with +">To (any of)</th>
+                            <th scope="col">Result</th><th scope="col"><span class="sr-only">Actions</span></th>
+                        </tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+                <p class="hint">Enter moves to the next row. Destinations: <code>3 5 7</code>, <code>3 / 5</code> or group names; a trailing <code>+</code> marks a favourite (shown only, the library doesn't use it yet).</p>
+            </div>
+            <div role="tabpanel" data-panel="io" class="panel io-panel">
+                <h3>Import</h3>
+                <textarea id="io-text" spellcheck="false" rows="9" placeholder="4 -> 3&#10;10 -> 5 / 11&#10;Anna: 11 -> 6+ / 9&#10;&#10;or groups: id min current max [name]"></textarea>
+                <div class="row wrap">
+                    <button id="import-moves-replace" type="button">Replace moves</button>
+                    <button id="import-moves-append" type="button" class="ghost">Append moves</button>
+                    <button id="import-groups" type="button" class="ghost">Replace groups</button>
+                    <button id="import-main" type="button" class="ghost" title="Seed line, groups, blank line, moves, blank line">main.cpp input</button>
+                </div>
+                <label class="check"><input id="create-missing" type="checkbox" checked> Create missing groups with size
+                    <input id="missing-size" type="number" min="0" value="15" class="tiny"> &#177;
+                    <input id="missing-slack" type="number" min="0" value="1" class="tiny"></label>
+                <ul id="io-errors" class="io-errors"></ul>
+                <details class="formats">
+                    <summary>Accepted formats</summary>
+                    <ul>
+                        <li>Moves, one per line: <code>4 3</code>, <code>4 -&gt; 3 / 5+</code>, <code>Anna: 4 -&gt; 3</code>, <code>Anna Smith 4 3 5</code>, or tab-separated from a spreadsheet. <code>#</code> starts a comment.</li>
+                        <li>Groups, one per line: <code>id min current max [name]</code> or <code>id size [name]</code>.</li>
+                        <li><strong>main.cpp input</strong> is exactly what <code>group_mover</code> reads: the seed, the groups, a blank line, the moves, a blank line.</li>
+                    </ul>
+                </details>
+                <h3>Export</h3>
+                <div class="row wrap">
+                    <button id="export-main-copy" type="button" class="ghost">Copy main.cpp input</button>
+                    <button id="export-main-file" type="button" class="ghost">Download main.cpp input</button>
+                    <button id="export-moves-text" type="button" class="ghost" title="Put the moves in the text box above">Moves to text box</button>
+                    <button id="export-groups-text" type="button" class="ghost" title="Put the groups in the text box above">Groups to text box</button>
+                </div>
+                <div class="row wrap">
+                    <button id="export-json" type="button" class="ghost">Save project (.json)</button>
+                    <label class="button ghost file-button">Open project…<input id="import-json" type="file" accept=".json,application/json"></label>
+                    <button id="export-link" type="button" class="ghost" title="A link that contains the whole input">Copy share link</button>
+                    <button id="generate" type="button" class="ghost">Generate a random class…</button>
+                </div>
+            </div>
+        </div>
+        <section class="problems" aria-label="Problems">
+            <header><h2>Problems</h2><span id="problem-summary" class="muted small"></span></header>
+            <ul id="problems"></ul>
+        </section>
+    </section>
+
+    <div class="splitter" id="splitter" role="separator" aria-orientation="vertical" aria-label="Resize panes" tabindex="0"></div>
+
+    <section class="pane pane-output" aria-label="Results">
+        <div class="summary" id="summary"></div>
+        <nav class="tabs" role="tablist" data-tabs="output">
+            <button role="tab" data-tab="graph">Graph</button>
+            <button role="tab" data-tab="flow">Before / after</button>
+            <button role="tab" data-tab="matrix">Matrix</button>
+            <button role="tab" data-tab="people">People</button>
+            <button role="tab" data-tab="groups-out">Groups</button>
+            <button role="tab" data-tab="analysis">Analysis</button>
+        </nav>
+        <div class="tab-panels">
+            <div role="tabpanel" data-panel="graph" class="panel graph-panel">
+                <div id="graph" class="graph-host"></div>
+                <aside id="details" class="details" aria-label="Selection details"></aside>
+            </div>
+            <div role="tabpanel" data-panel="flow" class="panel fill-panel"><div id="flow" class="fill-host"></div></div>
+            <div role="tabpanel" data-panel="matrix" class="panel"><div id="matrix"></div></div>
+            <div role="tabpanel" data-panel="people" class="panel"><div id="people"></div></div>
+            <div role="tabpanel" data-panel="groups-out" class="panel"><div id="groups-out"></div></div>
+            <div role="tabpanel" data-panel="analysis" class="panel"><div id="analysis"></div></div>
+        </div>
+    </section>
+</main>
+
+<footer class="app-footer">
+    <span id="library-info" class="muted small">Connecting to the server…</span>
+    <span class="spacer"></span>
+    <button id="rebuild" type="button" class="ghost small" title="Rebuild the library from ../group-mover.cpp and load it">Rebuild library</button>
+</footer>
+
+<div id="modal-root"></div>
+<div id="toasts" class="toasts" aria-live="polite"></div>
+<pre id="selftest-result" hidden></pre>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
